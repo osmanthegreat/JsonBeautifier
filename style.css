@@ -286,6 +286,7 @@ textarea {
   white-space: pre;
   overflow-wrap: normal;
   overflow-x: auto;
+  /* Allow horizontal scroll */
   z-index: 2;
   /* Ensure textarea is above highlight */
   position: relative;
@@ -309,6 +310,7 @@ textarea {
   /* Let clicks pass through to textarea */
   color: var(--text-primary);
   z-index: 1;
+  background: transparent;
 }
 
 /* Syntax Highlighting Colors */
