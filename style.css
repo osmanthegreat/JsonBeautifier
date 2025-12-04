@@ -28,10 +28,12 @@ body {
   font-family: var(--font-main);
   background-color: var(--bg-color);
   color: var(--text-primary);
-  min-height: 100vh;
+  height: 100vh;
+  /* Force fixed height */
   display: flex;
   flex-direction: column;
-  overflow-x: hidden;
+  overflow: hidden;
+  /* Prevent page scroll */
 }
 
 .app-container {
@@ -42,6 +44,8 @@ body {
   flex: 1;
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  /* Allow shrinking */
 }
 
 header {
@@ -75,6 +79,8 @@ main {
   flex-direction: column;
   gap: 1.5rem;
   animation: fadeInUp 0.8s ease-out 0.2s backwards;
+  min-height: 0;
+  /* Allow shrinking/scrolling */
 }
 
 /* ... previous styles ... */
@@ -84,8 +90,17 @@ main {
   grid-template-columns: 1fr auto 1fr;
   gap: 1.5rem;
   flex: 1;
-  min-height: 500px;
-  align-items: center;
+  min-height: 0;
+  /* Allow shrinking/scrolling, override fixed min-height if needed, or keep it but allow flex to work */
+  /* min-height: 500px;  <-- This was potentially forcing it to be at least 500px, but not preventing growth. */
+  /* We want it to fill available space. If available space < 500px, it should probably scroll or shrink? */
+  /* Let's keep a reasonable min-height but ensure it doesn't grow BEYOND available space due to content */
+  /* Actually, min-height: 0 is crucial for the child (pane) to scroll. */
+  /* If we want a minimum visual size, we can put min-height on the app-container or body? */
+  /* Or use min-height: 500px but overflow: hidden? */
+  /* Let's try min-height: 0 to enforce flex constraints first. */
+  align-items: stretch;
+  /* Stretch panes to fill height */
 }
 
 .actions-column {
