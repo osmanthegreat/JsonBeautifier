@@ -11,6 +11,9 @@ const outputStatus = document.getElementById('outputStatus');
 const inputLineNumbers = document.getElementById('inputLineNumbers');
 const outputLineNumbers = document.getElementById('outputLineNumbers');
 
+const inputHighlight = document.getElementById('inputHighlight');
+const outputHighlight = document.getElementById('outputHighlight');
+
 // Helper to show error
 function showError(message, position = null) {
   let displayMessage = message;
@@ -26,7 +29,7 @@ function showError(message, position = null) {
     displayMessage = `${message} (Line ${line}, Column ${column})`;
 
     errorDisplay.dataset.position = position;
-    errorDisplay.title = "Double-click to jump to error";
+    errorDisplay.title = "Click to jump to error";
     errorDisplay.classList.add('clickable');
   } else {
     delete errorDisplay.dataset.position;
@@ -60,8 +63,47 @@ function updateLineNumbers(textarea, lineNumbersEle) {
   lineNumbersEle.innerHTML = Array(lines).fill(0).map((_, i) => `<div>${i + 1}</div>`).join('');
 }
 
-function syncScroll(textarea, lineNumbersEle) {
+// Syntax Highlighting Logic
+function escapeHtml(unsafe) {
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function updateHighlighting(textarea, highlightEle) {
+  let text = textarea.value;
+
+  // Simple JSON syntax highlighting regex
+  // This is a basic implementation and might not cover all edge cases perfectly but works for standard JSON
+  const jsonRegex = /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g;
+
+  const highlighted = text.replace(jsonRegex, function (match) {
+    let cls = 'number';
+    if (/^"/.test(match)) {
+      if (/:$/.test(match)) {
+        cls = 'key';
+      } else {
+        cls = 'string';
+      }
+    } else if (/true|false/.test(match)) {
+      cls = 'boolean';
+    } else if (/null/.test(match)) {
+      cls = 'null';
+    }
+    return '<span class="' + cls + '">' + escapeHtml(match) + '</span>';
+  });
+
+  // Preserve newlines
+  highlightEle.innerHTML = highlighted + '<br>'; // Add break at end to match textarea behavior
+}
+
+function syncScroll(textarea, lineNumbersEle, highlightEle) {
   lineNumbersEle.scrollTop = textarea.scrollTop;
+  highlightEle.scrollTop = textarea.scrollTop;
+  highlightEle.scrollLeft = textarea.scrollLeft;
 }
 
 // Jump to error function
@@ -87,19 +129,19 @@ function jumpToError() {
 // Beautify Function
 function beautifyJSON() {
   clearError();
-  const rawValue = jsonInput.value.trim(); // Don't trim for line numbers accuracy? Actually trim is fine for input but might affect position slightly if leading whitespace.
-  // Let's use value directly for position accuracy, but trim for check.
+  const rawValue = jsonInput.value; // Use raw value for highlighting sync
 
-  if (!rawValue) {
+  if (!rawValue.trim()) {
     showError('Please enter some JSON to beautify.');
     return;
   }
 
   try {
-    const parsed = JSON.parse(jsonInput.value); // Use raw value
+    const parsed = JSON.parse(rawValue);
     const beautified = JSON.stringify(parsed, null, 2);
     jsonOutput.value = beautified;
     updateLineNumbers(jsonOutput, outputLineNumbers);
+    updateHighlighting(jsonOutput, outputHighlight);
     updateStatus(outputStatus, 'Beautified!');
   } catch (err) {
     let position = null;
@@ -122,18 +164,19 @@ function beautifyJSON() {
 // Minify Function
 function minifyJSON() {
   clearError();
-  const rawValue = jsonInput.value.trim();
+  const rawValue = jsonInput.value;
 
-  if (!rawValue) {
+  if (!rawValue.trim()) {
     showError('Please enter some JSON to minify.');
     return;
   }
 
   try {
-    const parsed = JSON.parse(jsonInput.value);
+    const parsed = JSON.parse(rawValue);
     const minified = JSON.stringify(parsed);
     jsonOutput.value = minified;
     updateLineNumbers(jsonOutput, outputLineNumbers);
+    updateHighlighting(jsonOutput, outputHighlight);
     updateStatus(outputStatus, 'Minified!');
   } catch (err) {
     let position = null;
@@ -151,6 +194,8 @@ function clearAll() {
   jsonOutput.value = '';
   updateLineNumbers(jsonInput, inputLineNumbers);
   updateLineNumbers(jsonOutput, outputLineNumbers);
+  updateHighlighting(jsonInput, inputHighlight);
+  updateHighlighting(jsonOutput, outputHighlight);
   clearError();
   inputStatus.textContent = '';
   outputStatus.textContent = '';
@@ -190,22 +235,25 @@ beautifyBtn.addEventListener('click', beautifyJSON);
 minifyBtn.addEventListener('click', minifyJSON);
 clearBtn.addEventListener('click', clearAll);
 copyBtn.addEventListener('click', copyToClipboard);
-errorDisplay.addEventListener('dblclick', jumpToError);
+errorDisplay.addEventListener('click', jumpToError); // Changed to single click
 
-// Line Numbers Events
+// Line Numbers & Highlighting Events
 jsonInput.addEventListener('input', () => {
   updateLineNumbers(jsonInput, inputLineNumbers);
+  updateHighlighting(jsonInput, inputHighlight);
 });
 jsonInput.addEventListener('scroll', () => {
-  syncScroll(jsonInput, inputLineNumbers);
+  syncScroll(jsonInput, inputLineNumbers, inputHighlight);
 });
 jsonOutput.addEventListener('scroll', () => {
-  syncScroll(jsonOutput, outputLineNumbers);
+  syncScroll(jsonOutput, outputLineNumbers, outputHighlight);
 });
 
-// Initialize line numbers
+// Initialize
 updateLineNumbers(jsonInput, inputLineNumbers);
 updateLineNumbers(jsonOutput, outputLineNumbers);
+updateHighlighting(jsonInput, inputHighlight);
+updateHighlighting(jsonOutput, outputHighlight);
 
 // Auto-resize textarea (optional enhancement)
 // jsonInput.addEventListener('input', () => {

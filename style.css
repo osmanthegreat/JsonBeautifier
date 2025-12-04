@@ -273,7 +273,10 @@ textarea {
   width: 100%;
   background: transparent;
   border: none;
-  color: var(--text-primary);
+  color: transparent;
+  /* Make text transparent for overlay */
+  caret-color: var(--text-primary);
+  /* Keep caret visible */
   padding: 1rem;
   font-family: var(--font-mono);
   font-size: 0.9rem;
@@ -281,10 +284,59 @@ textarea {
   resize: none;
   outline: none;
   white-space: pre;
-  /* Important for line sync */
   overflow-wrap: normal;
   overflow-x: auto;
+  z-index: 2;
+  /* Ensure textarea is above highlight */
+  position: relative;
 }
+
+.highlight-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  padding: 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  white-space: pre;
+  overflow-wrap: normal;
+  overflow: hidden;
+  /* Scroll synced via JS */
+  pointer-events: none;
+  /* Let clicks pass through to textarea */
+  color: var(--text-primary);
+  z-index: 1;
+}
+
+/* Syntax Highlighting Colors */
+.key {
+  color: #93c5fd;
+}
+
+/* Blue-300 */
+.string {
+  color: #86efac;
+}
+
+/* Green-300 */
+.number {
+  color: #fca5a5;
+}
+
+/* Red-300 */
+.boolean {
+  color: #f9a8d4;
+}
+
+/* Pink-300 */
+.null {
+  color: #cbd5e1;
+}
+
+/* Slate-300 */
 
 .error-display {
   background: rgba(239, 68, 68, 0.1);
