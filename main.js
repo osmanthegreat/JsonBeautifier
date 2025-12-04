@@ -175,24 +175,50 @@ function updateHighlighting(textarea, highlightEle) {
   // Simple JSON syntax highlighting regex
   const jsonRegex = /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g;
 
-  const highlighted = text.replace(jsonRegex, function (match) {
+  // First, we need to escape the entire text to prevent HTML injection
+  // But wait, if we escape first, the regex might not match correctly if it relies on unescaped chars
+  // Actually, JSON syntax chars (", :, {, }, [, ]) are safe except <, >, &
+  // The regex matches strings which might contain < > &
+  // So we should match on raw text, then escape the parts.
+
+  // Split text by regex match
+  let lastIndex = 0;
+  let html = '';
+  let match;
+
+  // We need to use exec in a loop to get all matches and non-matches
+  while ((match = jsonRegex.exec(text)) !== null) {
+    // Add non-matched text (escaped)
+    if (match.index > lastIndex) {
+      html += escapeHtml(text.substring(lastIndex, match.index));
+    }
+
+    // Add matched text (wrapped and escaped)
+    const matchedText = match[0];
     let cls = 'number';
-    if (/^"/.test(match)) {
-      if (/:$/.test(match)) {
+    if (/^"/.test(matchedText)) {
+      if (/:$/.test(matchedText)) {
         cls = 'key';
       } else {
         cls = 'string';
       }
-    } else if (/true|false/.test(match)) {
+    } else if (/true|false/.test(matchedText)) {
       cls = 'boolean';
-    } else if (/null/.test(match)) {
+    } else if (/null/.test(matchedText)) {
       cls = 'null';
     }
-    return '<span class="' + cls + '">' + escapeHtml(match) + '</span>';
-  });
+
+    html += `<span class="${cls}">${escapeHtml(matchedText)}</span>`;
+    lastIndex = jsonRegex.lastIndex;
+  }
+
+  // Add remaining text (escaped)
+  if (lastIndex < text.length) {
+    html += escapeHtml(text.substring(lastIndex));
+  }
 
   // Preserve newlines and ensure content exists
-  highlightEle.innerHTML = highlighted + '<br>';
+  highlightEle.innerHTML = html + '<br>';
 }
 
 function syncScroll(textarea, lineNumbersEle, highlightEle) {
@@ -280,10 +306,37 @@ function beautifyJSON() {
     updateStatus(outputStatus, 'Beautified!');
   } catch (err) {
     let position = null;
-    const match = err.message.match(/at position (\d+)/);
+    // Try to find position in error message
+    // V8: "Unexpected token 'l', ... " at position 22"
+    // Firefox: "JSON.parse: unexpected character at line 1 column 2 of the JSON data"
+
+    // Regex for "at position X"
+    let match = err.message.match(/at position (\d+)/);
     if (match) {
       position = parseInt(match[1], 10);
     }
+    // Regex for "line X column Y"
+    else if ((match = err.message.match(/line (\d+) column (\d+)/))) {
+      // Convert line/col to position (approximate if we don't want to scan)
+      // But we need exact position for setSelectionRange.
+      // We can iterate to find it.
+      const line = parseInt(match[1], 10);
+      const col = parseInt(match[2], 10);
+      const lines = rawValue.split('\n');
+      if (lines.length >= line) {
+        let pos = 0;
+        for (let i = 0; i < line - 1; i++) {
+          pos += lines[i].length + 1; // +1 for newline
+        }
+        pos += col - 1;
+        position = pos;
+      }
+    }
+    // Regex for "Unexpected token X in JSON at position Y"
+    else if ((match = err.message.match(/at position (\d+)/))) {
+      position = parseInt(match[1], 10);
+    }
+
     showError(`Invalid JSON: ${err.message}`, position);
   }
 }
@@ -307,9 +360,21 @@ function minifyJSON() {
     updateStatus(outputStatus, 'Minified!');
   } catch (err) {
     let position = null;
-    const match = err.message.match(/at position (\d+)/);
+    let match = err.message.match(/at position (\d+)/);
     if (match) {
       position = parseInt(match[1], 10);
+    } else if ((match = err.message.match(/line (\d+) column (\d+)/))) {
+      const line = parseInt(match[1], 10);
+      const col = parseInt(match[2], 10);
+      const lines = rawValue.split('\n');
+      if (lines.length >= line) {
+        let pos = 0;
+        for (let i = 0; i < line - 1; i++) {
+          pos += lines[i].length + 1;
+        }
+        pos += col - 1;
+        position = pos;
+      }
     }
     showError(`Invalid JSON: ${err.message}`, position);
   }
