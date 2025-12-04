@@ -251,6 +251,19 @@ textarea::-webkit-scrollbar-thumb:hover {
   font-size: 0.9rem;
   margin-top: 1rem;
   animation: shake 0.5s cubic-bezier(.36, .07, .19, .97) both;
+  transition: all 0.2s ease;
+}
+
+.error-display.clickable {
+  cursor: pointer;
+  border-color: rgba(239, 68, 68, 0.6);
+  background: rgba(239, 68, 68, 0.15);
+}
+
+.error-display.clickable:hover {
+  background: rgba(239, 68, 68, 0.2);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.1);
 }
 
 .error-display.hidden {

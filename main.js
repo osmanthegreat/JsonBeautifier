@@ -9,18 +9,28 @@ const inputStatus = document.getElementById('inputStatus');
 const outputStatus = document.getElementById('outputStatus');
 
 // Helper to show error
-function showError(message) {
+function showError(message, position = null) {
   errorDisplay.textContent = message;
   errorDisplay.classList.remove('hidden');
-  setTimeout(() => {
-    errorDisplay.classList.add('hidden');
-  }, 5000);
+
+  // Store position for navigation
+  if (position !== null) {
+    errorDisplay.dataset.position = position;
+    errorDisplay.title = "Double-click to jump to error";
+    errorDisplay.classList.add('clickable');
+  } else {
+    delete errorDisplay.dataset.position;
+    errorDisplay.title = "";
+    errorDisplay.classList.remove('clickable');
+  }
 }
 
 // Helper to clear error
 function clearError() {
   errorDisplay.textContent = '';
   errorDisplay.classList.add('hidden');
+  delete errorDisplay.dataset.position;
+  errorDisplay.classList.remove('clickable');
 }
 
 // Helper to update status
@@ -29,6 +39,26 @@ function updateStatus(element, text) {
   setTimeout(() => {
     element.textContent = '';
   }, 2000);
+}
+
+// Jump to error function
+function jumpToError() {
+  const position = errorDisplay.dataset.position;
+  if (position) {
+    const pos = parseInt(position, 10);
+    jsonInput.focus();
+    jsonInput.setSelectionRange(pos, pos + 1);
+
+    // Calculate scroll position (approximate)
+    const text = jsonInput.value;
+    const lines = text.substring(0, pos).split('\n');
+    const lineNum = lines.length;
+
+    // Scroll to line
+    const lineHeight = 20; // Approximation, better to get computed style
+    const scrollTo = (lineNum - 1) * lineHeight;
+    jsonInput.scrollTop = scrollTo - (jsonInput.clientHeight / 2);
+  }
 }
 
 // Beautify Function
@@ -47,7 +77,16 @@ function beautifyJSON() {
     jsonOutput.value = beautified;
     updateStatus(outputStatus, 'Beautified!');
   } catch (err) {
-    showError(`Invalid JSON: ${err.message}`);
+    // Extract position from error message if possible
+    // V8 error format: "Unexpected token 'a', ... " at position 123" (sometimes)
+    // Or "Unexpected token a in JSON at position 1"
+    let position = null;
+    const match = err.message.match(/at position (\d+)/);
+    if (match) {
+      position = parseInt(match[1], 10);
+    }
+
+    showError(`Invalid JSON: ${err.message}`, position);
   }
 }
 
@@ -67,7 +106,12 @@ function minifyJSON() {
     jsonOutput.value = minified;
     updateStatus(outputStatus, 'Minified!');
   } catch (err) {
-    showError(`Invalid JSON: ${err.message}`);
+    let position = null;
+    const match = err.message.match(/at position (\d+)/);
+    if (match) {
+      position = parseInt(match[1], 10);
+    }
+    showError(`Invalid JSON: ${err.message}`, position);
   }
 }
 
@@ -114,6 +158,7 @@ beautifyBtn.addEventListener('click', beautifyJSON);
 minifyBtn.addEventListener('click', minifyJSON);
 clearBtn.addEventListener('click', clearAll);
 copyBtn.addEventListener('click', copyToClipboard);
+errorDisplay.addEventListener('dblclick', jumpToError);
 
 // Auto-resize textarea (optional enhancement)
 // jsonInput.addEventListener('input', () => {
