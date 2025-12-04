@@ -28,7 +28,10 @@
             <span>Input JSON</span>
             <span id="inputStatus" class="status"></span>
           </div>
-          <textarea id="jsonInput" placeholder="Paste your JSON here..."></textarea>
+          <div class="editor-wrapper">
+            <div id="inputLineNumbers" class="line-numbers"></div>
+            <textarea id="jsonInput" placeholder="Paste your JSON here..." spellcheck="false"></textarea>
+          </div>
         </div>
 
         <div class="actions-column">
@@ -57,7 +60,10 @@
             </div>
             <span id="outputStatus" class="status"></span>
           </div>
-          <textarea id="jsonOutput" readonly placeholder="Result will appear here..."></textarea>
+          <div class="editor-wrapper">
+            <div id="outputLineNumbers" class="line-numbers"></div>
+            <textarea id="jsonOutput" readonly placeholder="Result will appear here..." spellcheck="false"></textarea>
+          </div>
         </div>
       </div>
 

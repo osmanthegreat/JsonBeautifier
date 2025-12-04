@@ -241,6 +241,51 @@ textarea::-webkit-scrollbar-thumb:hover {
   background: var(--secondary-hover);
 }
 
+/* Line Numbers & Editor Wrapper */
+.editor-wrapper {
+  display: flex;
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  height: 100%;
+}
+
+.line-numbers {
+  padding: 1rem 0.5rem;
+  background: rgba(0, 0, 0, 0.3);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  text-align: right;
+  border-right: 1px solid var(--border-color);
+  user-select: none;
+  overflow: hidden;
+  min-width: 3rem;
+}
+
+.line-numbers div {
+  padding: 0 0.2rem;
+}
+
+textarea {
+  flex: 1;
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  padding: 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  resize: none;
+  outline: none;
+  white-space: pre;
+  /* Important for line sync */
+  overflow-wrap: normal;
+  overflow-x: auto;
+}
+
 .error-display {
   background: rgba(239, 68, 68, 0.1);
   border: 1px solid rgba(239, 68, 68, 0.3);

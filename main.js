@@ -8,13 +8,23 @@ const errorDisplay = document.getElementById('errorDisplay');
 const inputStatus = document.getElementById('inputStatus');
 const outputStatus = document.getElementById('outputStatus');
 
+const inputLineNumbers = document.getElementById('inputLineNumbers');
+const outputLineNumbers = document.getElementById('outputLineNumbers');
+
 // Helper to show error
 function showError(message, position = null) {
-  errorDisplay.textContent = message;
-  errorDisplay.classList.remove('hidden');
+  let displayMessage = message;
 
   // Store position for navigation
   if (position !== null) {
+    // Calculate line and column
+    const text = jsonInput.value;
+    const lines = text.substring(0, position).split('\n');
+    const line = lines.length;
+    const column = lines[lines.length - 1].length + 1;
+
+    displayMessage = `${message} (Line ${line}, Column ${column})`;
+
     errorDisplay.dataset.position = position;
     errorDisplay.title = "Double-click to jump to error";
     errorDisplay.classList.add('clickable');
@@ -23,6 +33,9 @@ function showError(message, position = null) {
     errorDisplay.title = "";
     errorDisplay.classList.remove('clickable');
   }
+
+  errorDisplay.textContent = displayMessage;
+  errorDisplay.classList.remove('hidden');
 }
 
 // Helper to clear error
@@ -39,6 +52,16 @@ function updateStatus(element, text) {
   setTimeout(() => {
     element.textContent = '';
   }, 2000);
+}
+
+// Line Numbers Logic
+function updateLineNumbers(textarea, lineNumbersEle) {
+  const lines = textarea.value.split('\n').length;
+  lineNumbersEle.innerHTML = Array(lines).fill(0).map((_, i) => `<div>${i + 1}</div>`).join('');
+}
+
+function syncScroll(textarea, lineNumbersEle) {
+  lineNumbersEle.scrollTop = textarea.scrollTop;
 }
 
 // Jump to error function
@@ -64,7 +87,8 @@ function jumpToError() {
 // Beautify Function
 function beautifyJSON() {
   clearError();
-  const rawValue = jsonInput.value.trim();
+  const rawValue = jsonInput.value.trim(); // Don't trim for line numbers accuracy? Actually trim is fine for input but might affect position slightly if leading whitespace.
+  // Let's use value directly for position accuracy, but trim for check.
 
   if (!rawValue) {
     showError('Please enter some JSON to beautify.');
@@ -72,18 +96,23 @@ function beautifyJSON() {
   }
 
   try {
-    const parsed = JSON.parse(rawValue);
+    const parsed = JSON.parse(jsonInput.value); // Use raw value
     const beautified = JSON.stringify(parsed, null, 2);
     jsonOutput.value = beautified;
+    updateLineNumbers(jsonOutput, outputLineNumbers);
     updateStatus(outputStatus, 'Beautified!');
   } catch (err) {
-    // Extract position from error message if possible
-    // V8 error format: "Unexpected token 'a', ... " at position 123" (sometimes)
-    // Or "Unexpected token a in JSON at position 1"
     let position = null;
+    // Try to find position in error message
+    // Chrome/V8: "Unexpected token 'a', ... " at position 123"
+    // Firefox: "JSON.parse: unexpected character at line 1 column 2 of the JSON data" -> tricky to map to index without parsing manually
+
     const match = err.message.match(/at position (\d+)/);
     if (match) {
       position = parseInt(match[1], 10);
+    } else if (err.message.includes("line") && err.message.includes("column")) {
+      // Fallback for some browsers if they give line/col directly, but we need index for setSelectionRange
+      // We can try to parse it out, but V8 usually gives position.
     }
 
     showError(`Invalid JSON: ${err.message}`, position);
@@ -101,9 +130,10 @@ function minifyJSON() {
   }
 
   try {
-    const parsed = JSON.parse(rawValue);
+    const parsed = JSON.parse(jsonInput.value);
     const minified = JSON.stringify(parsed);
     jsonOutput.value = minified;
+    updateLineNumbers(jsonOutput, outputLineNumbers);
     updateStatus(outputStatus, 'Minified!');
   } catch (err) {
     let position = null;
@@ -119,6 +149,8 @@ function minifyJSON() {
 function clearAll() {
   jsonInput.value = '';
   jsonOutput.value = '';
+  updateLineNumbers(jsonInput, inputLineNumbers);
+  updateLineNumbers(jsonOutput, outputLineNumbers);
   clearError();
   inputStatus.textContent = '';
   outputStatus.textContent = '';
@@ -159,6 +191,21 @@ minifyBtn.addEventListener('click', minifyJSON);
 clearBtn.addEventListener('click', clearAll);
 copyBtn.addEventListener('click', copyToClipboard);
 errorDisplay.addEventListener('dblclick', jumpToError);
+
+// Line Numbers Events
+jsonInput.addEventListener('input', () => {
+  updateLineNumbers(jsonInput, inputLineNumbers);
+});
+jsonInput.addEventListener('scroll', () => {
+  syncScroll(jsonInput, inputLineNumbers);
+});
+jsonOutput.addEventListener('scroll', () => {
+  syncScroll(jsonOutput, outputLineNumbers);
+});
+
+// Initialize line numbers
+updateLineNumbers(jsonInput, inputLineNumbers);
+updateLineNumbers(jsonOutput, outputLineNumbers);
 
 // Auto-resize textarea (optional enhancement)
 // jsonInput.addEventListener('input', () => {
