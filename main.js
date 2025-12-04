@@ -14,6 +14,53 @@ const outputLineNumbers = document.getElementById('outputLineNumbers');
 const inputHighlight = document.getElementById('inputHighlight');
 const outputHighlight = document.getElementById('outputHighlight');
 
+// Event Listeners
+// We need to listen to the scroll of the parent container (.code-container)
+// Structure: textarea -> code-content -> code-container
+const inputContainer = jsonInput.closest('.code-container');
+const outputContainer = jsonOutput.closest('.code-container');
+
+if (inputContainer && outputContainer) {
+  inputContainer.addEventListener('scroll', () => {
+    inputLineNumbers.scrollTop = inputContainer.scrollTop;
+  });
+
+  outputContainer.addEventListener('scroll', () => {
+    outputLineNumbers.scrollTop = outputContainer.scrollTop;
+  });
+}
+
+jsonInput.addEventListener('input', () => {
+  updateLineNumbers(jsonInput, inputLineNumbers);
+  updateHighlighting(jsonInput, inputHighlight);
+});
+
+// Window resize to recalculate line heights
+window.addEventListener('resize', () => {
+  updateLineNumbers(jsonInput, inputLineNumbers);
+  updateLineNumbers(jsonOutput, outputLineNumbers);
+});
+
+// ResizeObserver for textareas (handles container resize)
+const resizeObserver = new ResizeObserver(() => {
+  updateLineNumbers(jsonInput, inputLineNumbers);
+  updateLineNumbers(jsonOutput, outputLineNumbers);
+});
+resizeObserver.observe(jsonInput);
+resizeObserver.observe(jsonOutput);
+
+// Wait for fonts to load
+document.fonts.ready.then(() => {
+  updateLineNumbers(jsonInput, inputLineNumbers);
+  updateLineNumbers(jsonOutput, outputLineNumbers);
+});
+
+// Initialize
+updateLineNumbers(jsonInput, inputLineNumbers);
+updateLineNumbers(jsonOutput, outputLineNumbers);
+updateHighlighting(jsonInput, inputHighlight);
+updateHighlighting(jsonOutput, outputHighlight);
+
 // Helper to show error
 function showError(message, position = null) {
   let displayMessage = message;
@@ -59,8 +106,51 @@ function updateStatus(element, text) {
 
 // Line Numbers Logic
 function updateLineNumbers(textarea, lineNumbersEle) {
-  const lines = textarea.value.split('\n').length;
-  lineNumbersEle.innerHTML = Array(lines).fill(0).map((_, i) => `<div>${i + 1}</div>`).join('');
+  const text = textarea.value;
+  const lines = text.split('\n');
+
+  // Create a temporary element to measure line heights
+  const measureDiv = document.createElement('div');
+  measureDiv.style.visibility = 'hidden';
+  measureDiv.style.position = 'absolute';
+  measureDiv.style.whiteSpace = 'pre-wrap';
+  measureDiv.style.wordWrap = 'break-word';
+  measureDiv.style.width = textarea.clientWidth + 'px'; // Match textarea width
+
+  // Copy all relevant font styles
+  const computedStyle = getComputedStyle(textarea);
+  measureDiv.style.fontFamily = computedStyle.fontFamily;
+  measureDiv.style.fontSize = computedStyle.fontSize;
+  measureDiv.style.lineHeight = computedStyle.lineHeight;
+  // Only copy horizontal padding to ensure correct wrapping width
+  measureDiv.style.paddingLeft = computedStyle.paddingLeft;
+  measureDiv.style.paddingRight = computedStyle.paddingRight;
+  measureDiv.style.paddingTop = '0';
+  measureDiv.style.paddingBottom = '0';
+  measureDiv.style.border = 'none'; // Ensure no border adds to height
+
+  measureDiv.style.boxSizing = 'border-box';
+  measureDiv.style.letterSpacing = computedStyle.letterSpacing;
+  measureDiv.style.fontWeight = computedStyle.fontWeight;
+  measureDiv.style.textRendering = computedStyle.textRendering;
+  measureDiv.style.tabSize = computedStyle.tabSize;
+  measureDiv.style.overflowWrap = computedStyle.overflowWrap; // Important
+  measureDiv.style.wordBreak = computedStyle.wordBreak; // Important
+
+  document.body.appendChild(measureDiv);
+
+  let lineNumbersHtml = '';
+
+  lines.forEach((line, index) => {
+    // For empty lines, we need a non-breaking space to get height
+    // Also handle lines with only spaces
+    measureDiv.textContent = line || '\u200B';
+    const height = measureDiv.offsetHeight;
+    lineNumbersHtml += `<div style="height: ${height}px">${index + 1}</div>`;
+  });
+
+  document.body.removeChild(measureDiv);
+  lineNumbersEle.innerHTML = lineNumbersHtml;
 }
 
 // Syntax Highlighting Logic
@@ -76,8 +166,13 @@ function escapeHtml(unsafe) {
 function updateHighlighting(textarea, highlightEle) {
   let text = textarea.value;
 
+  // If text is empty, clear highlight
+  if (!text) {
+    highlightEle.innerHTML = '';
+    return;
+  }
+
   // Simple JSON syntax highlighting regex
-  // This is a basic implementation and might not cover all edge cases perfectly but works for standard JSON
   const jsonRegex = /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g;
 
   const highlighted = text.replace(jsonRegex, function (match) {
@@ -96,14 +191,51 @@ function updateHighlighting(textarea, highlightEle) {
     return '<span class="' + cls + '">' + escapeHtml(match) + '</span>';
   });
 
-  // Preserve newlines
-  highlightEle.innerHTML = highlighted + '<br>'; // Add break at end to match textarea behavior
+  // Preserve newlines and ensure content exists
+  highlightEle.innerHTML = highlighted + '<br>';
 }
 
 function syncScroll(textarea, lineNumbersEle, highlightEle) {
-  lineNumbersEle.scrollTop = textarea.scrollTop;
-  highlightEle.scrollTop = textarea.scrollTop;
-  highlightEle.scrollLeft = textarea.scrollLeft;
+  // Sync vertical scroll only, as horizontal is handled by container/wrap
+  // Actually, textarea is now absolute and container scrolls.
+  // Wait, if textarea is absolute, it doesn't scroll itself?
+  // The container scrolls. So we need to listen to container scroll?
+  // Let's check the CSS again. .code-container has overflow-y: auto.
+  // So the scroll event will be on .code-container.
+
+  // We need to find the container
+  const container = textarea.parentElement;
+  lineNumbersEle.scrollTop = container.scrollTop;
+
+  // Highlight layer is absolute top:0 left:0 in container, so it moves with container scroll?
+  // No, if container scrolls, its content moves up.
+  // Both textarea and highlight are absolute top:0.
+  // If container scrolls, they stay at top:0 relative to container?
+  // Unless container is relative. Yes it is.
+  // Actually, if children are absolute, they don't contribute to scroll height unless specified.
+  // We need at least one child to have height to force scroll.
+  // Or we set min-height on them.
+
+  // Actually, better approach:
+  // Textarea should be relative/static to push height?
+  // In CSS I set textarea position: absolute. This removes it from flow.
+  // Highlight is also absolute.
+  // So container has 0 height content?
+  // I need to make one of them relative or use JS to set container height?
+  // Or make highlight relative and textarea absolute overlay?
+  // Let's make highlight relative (it has the content height) and textarea absolute on top.
+  // But textarea needs to be on top for interaction.
+  // If textarea is absolute, it won't expand container.
+
+  // Let's modify CSS in next step if needed, but for now let's assume one is relative.
+  // If I change highlight to relative, it will expand container.
+  // Textarea absolute on top.
+  // Then container scrolls, and both move up?
+  // If highlight is relative, it scrolls naturally.
+  // Textarea absolute top:0 will scroll with it? Yes, if it's inside container.
+
+  // So syncScroll might not be needed for highlight/textarea sync if they are in same scrolling container!
+  // We just need to sync lineNumbersEle.scrollTop with container.scrollTop.
 }
 
 // Jump to error function
@@ -120,16 +252,19 @@ function jumpToError() {
     const lineNum = lines.length;
 
     // Scroll to line
-    const lineHeight = 20; // Approximation, better to get computed style
-    const scrollTo = (lineNum - 1) * lineHeight;
-    jsonInput.scrollTop = scrollTo - (jsonInput.clientHeight / 2);
+    // We need to find the line element to get exact position
+    const lineElement = inputLineNumbers.children[lineNum - 1];
+    if (lineElement) {
+      const container = jsonInput.closest('.code-container');
+      container.scrollTop = lineElement.offsetTop - (container.clientHeight / 2);
+    }
   }
 }
 
 // Beautify Function
 function beautifyJSON() {
   clearError();
-  const rawValue = jsonInput.value; // Use raw value for highlighting sync
+  const rawValue = jsonInput.value;
 
   if (!rawValue.trim()) {
     showError('Please enter some JSON to beautify.');
@@ -145,18 +280,10 @@ function beautifyJSON() {
     updateStatus(outputStatus, 'Beautified!');
   } catch (err) {
     let position = null;
-    // Try to find position in error message
-    // Chrome/V8: "Unexpected token 'a', ... " at position 123"
-    // Firefox: "JSON.parse: unexpected character at line 1 column 2 of the JSON data" -> tricky to map to index without parsing manually
-
     const match = err.message.match(/at position (\d+)/);
     if (match) {
       position = parseInt(match[1], 10);
-    } else if (err.message.includes("line") && err.message.includes("column")) {
-      // Fallback for some browsers if they give line/col directly, but we need index for setSelectionRange
-      // We can try to parse it out, but V8 usually gives position.
     }
-
     showError(`Invalid JSON: ${err.message}`, position);
   }
 }
@@ -235,27 +362,4 @@ beautifyBtn.addEventListener('click', beautifyJSON);
 minifyBtn.addEventListener('click', minifyJSON);
 clearBtn.addEventListener('click', clearAll);
 copyBtn.addEventListener('click', copyToClipboard);
-errorDisplay.addEventListener('click', jumpToError); // Changed to single click
-
-// Line Numbers & Highlighting Events
-jsonInput.addEventListener('input', () => {
-  updateLineNumbers(jsonInput, inputLineNumbers);
-  updateHighlighting(jsonInput, inputHighlight);
-});
-jsonInput.addEventListener('scroll', () => {
-  syncScroll(jsonInput, inputLineNumbers, inputHighlight);
-});
-jsonOutput.addEventListener('scroll', () => {
-  syncScroll(jsonOutput, outputLineNumbers, outputHighlight);
-});
-
-// Initialize
-updateLineNumbers(jsonInput, inputLineNumbers);
-updateLineNumbers(jsonOutput, outputLineNumbers);
-updateHighlighting(jsonInput, inputHighlight);
-updateHighlighting(jsonOutput, outputHighlight);
-
-// Auto-resize textarea (optional enhancement)
-// jsonInput.addEventListener('input', () => {
-//   clearError();
-// });
+errorDisplay.addEventListener('click', jumpToError);
